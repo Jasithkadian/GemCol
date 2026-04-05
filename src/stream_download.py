@@ -19,9 +19,8 @@ for i, doc in enumerate(dataset):
         continue
     
     documents.append({
-        "id": i,
         "title": doc.get('title', f'Doc_{i}'),
-        "text": text[:1000]
+        "content": text[:1000]
     })
     
     if len(documents) >= 100:

@@ -22,9 +22,8 @@ for i, doc in enumerate(tqdm(dataset, desc="Processing")):
         continue
     
     documents.append({
-        "id": i,
         "title": doc.get('title', f'Doc_{i}'),
-        "text": text[:1000]
+        "content": text[:1000]
     })
 
 # Save

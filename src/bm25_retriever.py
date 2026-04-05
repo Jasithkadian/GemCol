@@ -2,11 +2,13 @@ import json
 import os
 from rank_bm25 import BM25Okapi
 
+MIN_SCORE_THRESHOLD = 0.01
+
 class BM25Retriever:
     def __init__(self, documents):
         self.documents = documents
         # Preprocess: Simple lowercase split tokenization
-        tokenized_corpus = [doc['text'].lower().split() for doc in documents]
+        tokenized_corpus = [doc.get('content', doc.get('text', '')).lower().split() for doc in documents]
         self.bm25 = BM25Okapi(tokenized_corpus)
 
     def search(self, query, top_k=3):
@@ -22,12 +24,17 @@ class BM25Retriever:
         # Prepare results
         results = []
         for i in top_indices:
+            score = doc_scores[i]
+            if score < MIN_SCORE_THRESHOLD:
+                continue
+                
             # Safely grab title if it exists, otherwise use ID
-            title = self.documents[i].get("title", f"Doc {self.documents[i]['id']}")
+            doc_id = self.documents[i].get("id", i)
+            title = self.documents[i].get("title", f"Doc {doc_id}")
             results.append({
-                "id": self.documents[i]["id"],
+                "id": doc_id,
                 "title": title,
-                "score": doc_scores[i]
+                "score": score
             })
         return results
 
