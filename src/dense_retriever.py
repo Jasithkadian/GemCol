@@ -3,9 +3,10 @@ import os
 import numpy as np
 import faiss
 from sentence_transformers import SentenceTransformer
+from config import DENSE_MODEL_NAME
 
 class DenseRetriever:
-    def __init__(self, documents, model_name="all-MiniLM-L6-v2", index_path=None, embeddings_path=None):
+    def __init__(self, documents, model_name=DENSE_MODEL_NAME, index_path=None, embeddings_path=None):
         self.documents = documents
         self.model = SentenceTransformer(model_name)
         

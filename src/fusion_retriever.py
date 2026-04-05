@@ -5,12 +5,10 @@ import os
 # Make sure no name resolution conflicts exist based on your directory structure
 from bm25_retriever import BM25Retriever
 from dense_retriever import DenseRetriever
-
-FUSION_METHOD = "alpha"   # "rrf" or "alpha"
-ALPHA = 0.7               # weight for dense score (0.7 = 70% dense, 30% BM25)
+from config import FUSION_METHOD, ALPHA, TOP_K_RESULTS, FETCH_K, RRF_K
 
 class FusionRetriever:
-    def __init__(self, bm25_retriever, dense_retriever, rrf_k=60):
+    def __init__(self, bm25_retriever, dense_retriever, rrf_k=RRF_K):
         self.bm25 = bm25_retriever
         self.dense = dense_retriever
         self.k = rrf_k
@@ -85,6 +83,14 @@ class FusionRetriever:
 
         return bm25_results[:top_k], dense_results[:top_k], hybrid_results
 
+def relevance_label(score):
+    if score >= 0.6:
+        return "HIGH    "
+    elif score >= 0.3:
+        return "MEDIUM  "
+    else:
+        return "LOW     "
+
 def main():
     base_dir = os.path.dirname(os.path.dirname(os.path.abspath(__file__)))
     docs_path = os.path.join(base_dir, "data", "raw", "documents.json")
@@ -117,7 +123,7 @@ def main():
         dense_r.build_index()
 
     # Initialize Fusion
-    fusion_r = FusionRetriever(bm25_r, dense_r, rrf_k=60)
+    fusion_r = FusionRetriever(bm25_r, dense_r, rrf_k=RRF_K)
 
     print("=" * 60)
 
@@ -129,8 +135,12 @@ def main():
             
         print(f"Query: {query_text}\n")
         
-        # We fetch 10 results from each to compute RRF, but only show top 3
-        bm25_res, dense_res, hybrid_res = fusion_r.hybrid_search(query_text, top_k=3, fetch_k=10)
+        # We fetch FETCH_K results from each to compute RRF, but only show TOP_K_RESULTS
+        bm25_res, dense_res, hybrid_res = fusion_r.hybrid_search(
+            query_text, 
+            top_k=TOP_K_RESULTS, 
+            fetch_k=FETCH_K
+        )
 
         print("BM25 Results:")
         for res in bm25_res:
@@ -138,12 +148,16 @@ def main():
             
         print("\nDense Results:")
         for res in dense_res:
-            # Note: Dense score is distance, so lower is actually a better match in our FAISS setup
-            print(f"-> {res['title']} (Score: {res['score']:.4f})")
+            print(f"-> {res['title']:<14} (Similarity: {res['score']*100:>5.2f}%)")
             
         print("\nHybrid Results:")
-        for res in hybrid_res:
-            print(f"-> {res['title']} (Fusion Score: {res['fusion_score']:.5f})")
+        for rank, res in enumerate(hybrid_res, 1):
+            print(f"Rank {rank} | {res['title']:<19} | Score: {res['fusion_score']:.4f} | Relevance: {relevance_label(res['fusion_score'])}")
+            
+        if hybrid_res:
+            top_res = hybrid_res[0]
+            top_label = relevance_label(top_res['fusion_score']).strip()
+            print(f"\nTop Match: {top_res['title']} | Confidence: {top_res['fusion_score']*100:.2f}% | Relevance: {top_label}")
             
         print("-" * 60)
 

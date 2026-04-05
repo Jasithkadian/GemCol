@@ -1,8 +1,7 @@
 import json
 import os
 from rank_bm25 import BM25Okapi
-
-MIN_SCORE_THRESHOLD = 0.01
+from config import MIN_BM25_SCORE
 
 class BM25Retriever:
     def __init__(self, documents):
@@ -25,7 +24,7 @@ class BM25Retriever:
         results = []
         for i in top_indices:
             score = doc_scores[i]
-            if score < MIN_SCORE_THRESHOLD:
+            if score < MIN_BM25_SCORE:
                 continue
                 
             # Safely grab title if it exists, otherwise use ID
