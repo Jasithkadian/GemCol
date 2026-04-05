@@ -6,6 +6,9 @@ import os
 from bm25_retriever import BM25Retriever
 from dense_retriever import DenseRetriever
 
+FUSION_METHOD = "alpha"   # "rrf" or "alpha"
+ALPHA = 0.7               # weight for dense score (0.7 = 70% dense, 30% BM25)
+
 class FusionRetriever:
     def __init__(self, bm25_retriever, dense_retriever, rrf_k=60):
         self.bm25 = bm25_retriever
@@ -14,7 +17,7 @@ class FusionRetriever:
 
     def hybrid_search(self, query, top_k=3, fetch_k=20):
         """
-        Runs BM25 and Dense searches, then fuses results using RRF.
+        Runs BM25 and Dense searches, then fuses results using RRF or alpha fusion.
         fetch_k: how many candidates to pull from each system before fusing.
         top_k: how many final results to return.
         """
@@ -22,30 +25,55 @@ class FusionRetriever:
         bm25_results = self.bm25.search(query, top_k=fetch_k)
         dense_results = self.dense.search(query, top_k=fetch_k)
 
-        # RRF mapping
-        rrf_scores = {}
         title_map = {}
+        for res in bm25_results + dense_results:
+            title_map[res['id']] = res['title']
 
-        # 1. Process BM25 Ranks
-        for rank, res in enumerate(bm25_results, 1):
-            doc_id = res['id']
-            title_map[doc_id] = res['title']
+        if FUSION_METHOD == "alpha":
+            all_ids = set([res['id'] for res in bm25_results] + [res['id'] for res in dense_results])
             
-            if doc_id not in rrf_scores:
-                rrf_scores[doc_id] = 0.0
-            rrf_scores[doc_id] += 1.0 / (self.k + rank)
-
-        # 2. Process Dense Ranks
-        for rank, res in enumerate(dense_results, 1):
-            doc_id = res['id']
-            title_map[doc_id] = res['title']
+            bm25_scores = [res['score'] for res in bm25_results]
+            min_bm25 = min(bm25_scores) if bm25_scores else 0.0
+            max_bm25 = max(bm25_scores) if bm25_scores else 1.0
+            if max_bm25 == min_bm25:
+                max_bm25 = min_bm25 + 1e-9
+                
+            bm25_dict = {res['id']: res['score'] for res in bm25_results}
+            dense_dict = {res['id']: res['score'] for res in dense_results}
             
-            if doc_id not in rrf_scores:
-                rrf_scores[doc_id] = 0.0
-            rrf_scores[doc_id] += 1.0 / (self.k + rank)
+            hybrid_scores = {}
+            for doc_id in all_ids:
+                raw_bm25 = bm25_dict.get(doc_id, 0.0)
+                norm_bm25 = (raw_bm25 - min_bm25) / (max_bm25 - min_bm25)
+                norm_bm25 = max(0.0, min(1.0, norm_bm25))
+                
+                dense_score = dense_dict.get(doc_id, 0.0)
+                
+                hybrid_score = (ALPHA * dense_score) + ((1 - ALPHA) * norm_bm25)
+                hybrid_scores[doc_id] = hybrid_score
+                
+            sorted_fusion = sorted(hybrid_scores.items(), key=lambda x: x[1], reverse=True)
+            
+        else:
+            # RRF mapping
+            rrf_scores = {}
 
-        # 3. Sort Combined Results Descending (Higher RRF = Better Match)
-        sorted_fusion = sorted(rrf_scores.items(), key=lambda x: x[1], reverse=True)
+            # 1. Process BM25 Ranks
+            for rank, res in enumerate(bm25_results, 1):
+                doc_id = res['id']
+                if doc_id not in rrf_scores:
+                    rrf_scores[doc_id] = 0.0
+                rrf_scores[doc_id] += 1.0 / (self.k + rank)
+
+            # 2. Process Dense Ranks
+            for rank, res in enumerate(dense_results, 1):
+                doc_id = res['id']
+                if doc_id not in rrf_scores:
+                    rrf_scores[doc_id] = 0.0
+                rrf_scores[doc_id] += 1.0 / (self.k + rank)
+
+            # 3. Sort Combined Results Descending (Higher RRF = Better Match)
+            sorted_fusion = sorted(rrf_scores.items(), key=lambda x: x[1], reverse=True)
 
         hybrid_results = []
         for doc_id, score in sorted_fusion[:top_k]:
