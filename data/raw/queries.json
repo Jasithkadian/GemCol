@@ -1,22 +1,22 @@
 [
-    {
-        "id": "q1",
-        "text": "What is the capital of France?"
-    },
-    {
-        "id": "q2",
-        "text": "How does photosynthesis work?"
-    },
-    {
-        "id": "q3",
-        "text": "Who wrote Romeo and Juliet?"
-    },
-    {
-        "id": "q4",
-        "text": "History of artificial intelligence"
-    },
-    {
-        "id": "q5",
-        "text": "Causes of World War II"
-    }
+  {
+    "id": 1,
+    "query": "What is the capital of France?"
+  },
+  {
+    "id": 2,
+    "query": "Who wrote Romeo and Juliet?"
+  },
+  {
+    "id": 3,
+    "query": "How does photosynthesis work?"
+  },
+  {
+    "id": 4,
+    "query": "History of artificial intelligence"
+  },
+  {
+    "id": 5,
+    "query": "What were the main causes of World War II?"
+  }
 ]
