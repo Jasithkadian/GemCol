@@ -61,7 +61,7 @@ def main():
     base_dir = os.path.dirname(os.path.dirname(os.path.abspath(__file__)))
     docs_path = os.path.join(base_dir, "data", "raw", "documents.json")
     queries_path = os.path.join(base_dir, "data", "raw", "queries.json")
-    
+
     index_path = os.path.join(base_dir, "data", "indices", "faiss_index.bin")
     embeddings_path = os.path.join(base_dir, "data", "processed", "embeddings.npy")
 

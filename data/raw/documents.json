@@ -1,0 +1,27 @@
+[
+    {
+        "id": 1,
+        "title": "France",
+        "text": "Paris is the capital and most populous city of France."
+    },
+    {
+        "id": 2,
+        "title": "Photosynthesis",
+        "text": "Photosynthesis is a system used by plants and other organisms to convert light energy into chemical energy that, through cellular respiration, can later be released to fuel the organism's activities."
+    },
+    {
+        "id": 3,
+        "title": "William Shakespeare",
+        "text": "William Shakespeare was an English playwright, poet and actor. He wrote many famous plays including Romeo and Juliet, Hamlet, and Macbeth."
+    },
+    {
+        "id": 4,
+        "title": "Artificial Intelligence",
+        "text": "The history of artificial intelligence (AI) began in antiquity, with myths, stories and rumors of artificial beings endowed with intelligence or consciousness by master craftsmen. Modern AI research was founded in 1956."
+    },
+    {
+        "id": 5,
+        "title": "World War II",
+        "text": "The causes of World War II included the Italian Fascism in the 1920s, Japanese militarism and invasions of China in the 1930s, and especially the political takeover in 1933 of Germany by Hitler and his Nazi Party and its aggressive foreign policy."
+    }
+]
