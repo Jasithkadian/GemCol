@@ -20,6 +20,6 @@ FETCH_K = 10
 RRF_K = 60
 
 # Reranker Settings (for Section 4 later)
-ENABLE_RERANKER = False
+ENABLE_RERANKER = True
 RERANKER_MODEL = "cross-encoder/ms-marco-MiniLM-L-6-v2"
 RERANKER_TOP_K = 5

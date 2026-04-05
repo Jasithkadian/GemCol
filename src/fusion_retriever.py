@@ -5,7 +5,8 @@ import os
 # Make sure no name resolution conflicts exist based on your directory structure
 from bm25_retriever import BM25Retriever
 from dense_retriever import DenseRetriever
-from config import FUSION_METHOD, ALPHA, TOP_K_RESULTS, FETCH_K, RRF_K
+from config import FUSION_METHOD, ALPHA, TOP_K_RESULTS, FETCH_K, RRF_K, ENABLE_RERANKER, RERANKER_TOP_K
+from reranker import ReRanker, relevance_label as rerank_label
 
 class FusionRetriever:
     def __init__(self, bm25_retriever, dense_retriever, rrf_k=RRF_K):
@@ -124,6 +125,10 @@ def main():
 
     # Initialize Fusion
     fusion_r = FusionRetriever(bm25_r, dense_r, rrf_k=RRF_K)
+    
+    if ENABLE_RERANKER:
+        print("Initializing Cross-Encoder ReRanker...")
+        reranker = ReRanker()
 
     print("=" * 60)
 
@@ -158,6 +163,26 @@ def main():
             top_res = hybrid_res[0]
             top_label = relevance_label(top_res['fusion_score']).strip()
             print(f"\nTop Match: {top_res['title']} | Confidence: {top_res['fusion_score']*100:.2f}% | Relevance: {top_label}")
+            
+        if ENABLE_RERANKER:
+            # Map hybrid results back to full document dictionary structures
+            doc_dict = {doc.get("id", i): doc for i, doc in enumerate(documents)}
+            
+            candidates = []
+            for res in hybrid_res:
+                doc_id = res['id']
+                doc = doc_dict[doc_id]
+                candidates.append({
+                    "id": doc_id,
+                    "title": res['title'],
+                    "text": doc.get("content", doc.get("text", "")) 
+                })
+                
+            reranked_res = reranker.rerank(query_text, candidates, top_k=RERANKER_TOP_K)
+            print("\nReranked Results:")
+            for rank, res in enumerate(reranked_res, 1):
+                label = rerank_label(res['rerank_score'])
+                print(f"Rank {rank} | {res['title']:<19} | Rerank Score: {res['rerank_score']:.2f} | Relevance: {label}")
             
         print("-" * 60)
 
