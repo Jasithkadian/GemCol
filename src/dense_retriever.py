@@ -25,9 +25,12 @@ class DenseRetriever:
         # show_progress_bar gives visual feedback for large texts
         embeddings = self.model.encode(texts, show_progress_bar=True, convert_to_numpy=True)
         
-        # Build FAISS IndexFlatL2
+        # Normalize all document embeddings before adding to FAISS index
+        embeddings = embeddings / np.linalg.norm(embeddings, axis=1, keepdims=True)
+        
+        # Build FAISS IndexFlatIP
         print("Building FAISS index...")
-        self.index = faiss.IndexFlatL2(self.embedding_dim)
+        self.index = faiss.IndexFlatIP(self.embedding_dim)
         self.index.add(embeddings)
         print(f"Added {self.index.ntotal} embeddings to the index.")
 
@@ -56,8 +59,11 @@ class DenseRetriever:
         # Encode the query
         query_embedding = self.model.encode([query], convert_to_numpy=True)
         
+        # Normalize the query embedding the same way
+        query_embedding = query_embedding / np.linalg.norm(query_embedding)
+        
         # Search the index
-        # search returns squared L2 distances and the indices of the neighbors
+        # search returns cosine similarities and the indices of the neighbors
         distances, indices = self.index.search(query_embedding, top_k)
         
         # Prepare results
@@ -69,9 +75,9 @@ class DenseRetriever:
                 
             doc = self.documents[idx]
             results.append({
-                "id": doc["id"],
-                "title": doc.get("title", f"Doc {doc['id']}"),
-                "score": float(dist) # distance, so lower is actually better finding!
+                "id": doc.get("id", idx), # Safeguard added locally for removed ids
+                "title": doc.get("title", f"Doc {doc.get('id', idx)}"),
+                "score": float(dist) # cosine similarity, so higher is actually better finding!
             })
             
         return results
@@ -121,8 +127,8 @@ def main():
         top_results = retriever.search(query_text, top_k=3)
         
         for rank, res in enumerate(top_results, 1):
-            # For L2 distance, lower score is more similar
-            print(f"  {rank}. [Dist: {res['score']:.4f}] {res['title']} (ID: {res['id']})")
+            # For Cosine Similarity, higher score is more similar
+            print(f"  {rank}. [Score: {res['score']:.4f}] {res['title']} (ID: {res['id']})")
         print("-" * 50)
 
 if __name__ == "__main__":
