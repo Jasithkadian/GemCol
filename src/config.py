@@ -23,3 +23,6 @@ RRF_K = 60
 ENABLE_RERANKER = True
 RERANKER_MODEL = "cross-encoder/ms-marco-MiniLM-L-6-v2"
 RERANKER_TOP_K = 5
+
+# Interactive Mode
+INTERACTIVE_MODE = True

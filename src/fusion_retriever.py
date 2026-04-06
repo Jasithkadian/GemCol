@@ -5,8 +5,9 @@ import os
 # Make sure no name resolution conflicts exist based on your directory structure
 from bm25_retriever import BM25Retriever
 from dense_retriever import DenseRetriever
-from config import FUSION_METHOD, ALPHA, TOP_K_RESULTS, FETCH_K, RRF_K, ENABLE_RERANKER, RERANKER_TOP_K
+from config import INTERACTIVE_MODE, FUSION_METHOD, ALPHA, TOP_K_RESULTS, FETCH_K, RRF_K, ENABLE_RERANKER, RERANKER_TOP_K
 from reranker import ReRanker, relevance_label as rerank_label
+import time
 
 class FusionRetriever:
     def __init__(self, bm25_retriever, dense_retriever, rrf_k=RRF_K):
@@ -132,59 +133,142 @@ def main():
 
     print("=" * 60)
 
-    # Run queries and compare
-    for q in queries:
-        query_text = q.get("query", q.get("text", ""))
-        if not query_text:
-            continue
-            
-        print(f"Query: {query_text}\n")
+    if INTERACTIVE_MODE:
+        print("============================================")
+        print("GemCol Hybrid Search — Ready")
+        print("Type your question and press Enter to search")
+        print("Type 'quit' or 'exit' to stop")
+        print("============================================")
         
-        # We fetch FETCH_K results from each to compute RRF, but only show TOP_K_RESULTS
-        bm25_res, dense_res, hybrid_res = fusion_r.hybrid_search(
-            query_text, 
-            top_k=TOP_K_RESULTS, 
-            fetch_k=FETCH_K
-        )
-
-        print("BM25 Results:")
-        for res in bm25_res:
-            print(f"-> {res['title']} (Score: {res['score']:.4f})")
-            
-        print("\nDense Results:")
-        for res in dense_res:
-            print(f"-> {res['title']:<14} (Similarity: {res['score']*100:>5.2f}%)")
-            
-        print("\nHybrid Results:")
-        for rank, res in enumerate(hybrid_res, 1):
-            print(f"Rank {rank} | {res['title']:<19} | Score: {res['fusion_score']:.4f} | Relevance: {relevance_label(res['fusion_score'])}")
-            
-        if hybrid_res:
-            top_res = hybrid_res[0]
-            top_label = relevance_label(top_res['fusion_score']).strip()
-            print(f"\nTop Match: {top_res['title']} | Confidence: {top_res['fusion_score']*100:.2f}% | Relevance: {top_label}")
-            
-        if ENABLE_RERANKER:
-            # Map hybrid results back to full document dictionary structures
-            doc_dict = {doc.get("id", i): doc for i, doc in enumerate(documents)}
-            
-            candidates = []
-            for res in hybrid_res:
-                doc_id = res['id']
-                doc = doc_dict[doc_id]
-                candidates.append({
-                    "id": doc_id,
-                    "title": res['title'],
-                    "text": doc.get("content", doc.get("text", "")) 
-                })
+        history = []
+        
+        while True:
+            try:
+                user_input = input("\nSearch > ").strip()
+            except (KeyboardInterrupt, EOFError):
+                print("\nGoodbye!")
+                break
                 
-            reranked_res = reranker.rerank(query_text, candidates, top_k=RERANKER_TOP_K)
-            print("\nReranked Results:")
-            for rank, res in enumerate(reranked_res, 1):
-                label = rerank_label(res['rerank_score'])
-                print(f"Rank {rank} | {res['title']:<19} | Rerank Score: {res['rerank_score']:.2f} | Relevance: {label}")
+            if user_input.lower() in ["quit", "exit"]:
+                print("Goodbye!")
+                break
+                
+            if user_input.lower() == "history":
+                print(f"Search History ({len(history)} queries):")
+                for idx, hq in enumerate(history, 1):
+                    print(f"{idx}. {hq}")
+                continue
+                
+            if not user_input:
+                continue
+                
+            history.append(user_input)
             
-        print("-" * 60)
+            start_time = time.time()
+            
+            bm25_res, dense_res, hybrid_res = fusion_r.hybrid_search(
+                user_input, 
+                top_k=TOP_K_RESULTS, 
+                fetch_k=FETCH_K
+            )
+
+            print("BM25 Results:")
+            for res in bm25_res:
+                print(f"-> {res['title']} (Score: {res['score']:.4f})")
+                
+            print("\nDense Results:")
+            for res in dense_res:
+                print(f"-> {res['title']:<14} (Similarity: {res['score']*100:>5.2f}%)")
+                
+            print("\nHybrid Results:")
+            for rank, res in enumerate(hybrid_res, 1):
+                print(f"Rank {rank} | {res['title']:<19} | Score: {res['fusion_score']:.4f} | Relevance: {relevance_label(res['fusion_score'])}")
+                
+            if hybrid_res:
+                top_res = hybrid_res[0]
+                top_label = relevance_label(top_res['fusion_score']).strip()
+                print(f"\nTop Match: {top_res['title']} | Confidence: {top_res['fusion_score']*100:.2f}% | Relevance: {top_label}")
+                
+            if ENABLE_RERANKER:
+                doc_dict = {doc.get("id", i): doc for i, doc in enumerate(documents)}
+                candidates = []
+                for res in hybrid_res:
+                    doc_id = res['id']
+                    doc = doc_dict[doc_id]
+                    candidates.append({
+                        "id": doc_id,
+                        "title": res['title'],
+                        "text": doc.get("content", doc.get("text", "")) 
+                    })
+                    
+                reranked_res = reranker.rerank(user_input, candidates, top_k=RERANKER_TOP_K)
+                print("\nReranked Results:")
+                for rank, res in enumerate(reranked_res, 1):
+                    label = rerank_label(res['rerank_score'])
+                    print(f"Rank {rank} | {res['title']:<19} | Rerank Score: {res['rerank_score']:.2f} | Relevance: {label}")
+            
+            end_time = time.time()
+            print(f"\nQuery completed in {end_time - start_time:.2f}s")
+            print("-" * 60)
+            
+    else:
+        # Run queries and compare
+        for q in queries:
+            query_text = q.get("query", q.get("text", ""))
+            if not query_text:
+                continue
+                
+            print(f"Query: {query_text}\n")
+            
+            start_time = time.time()
+            
+            # We fetch FETCH_K results from each to compute RRF, but only show TOP_K_RESULTS
+            bm25_res, dense_res, hybrid_res = fusion_r.hybrid_search(
+                query_text, 
+                top_k=TOP_K_RESULTS, 
+                fetch_k=FETCH_K
+            )
+
+            print("BM25 Results:")
+            for res in bm25_res:
+                print(f"-> {res['title']} (Score: {res['score']:.4f})")
+                
+            print("\nDense Results:")
+            for res in dense_res:
+                print(f"-> {res['title']:<14} (Similarity: {res['score']*100:>5.2f}%)")
+                
+            print("\nHybrid Results:")
+            for rank, res in enumerate(hybrid_res, 1):
+                print(f"Rank {rank} | {res['title']:<19} | Score: {res['fusion_score']:.4f} | Relevance: {relevance_label(res['fusion_score'])}")
+                
+            if hybrid_res:
+                top_res = hybrid_res[0]
+                top_label = relevance_label(top_res['fusion_score']).strip()
+                print(f"\nTop Match: {top_res['title']} | Confidence: {top_res['fusion_score']*100:.2f}% | Relevance: {top_label}")
+                
+            if ENABLE_RERANKER:
+                # Map hybrid results back to full document dictionary structures
+                doc_dict = {doc.get("id", i): doc for i, doc in enumerate(documents)}
+                
+                candidates = []
+                for res in hybrid_res:
+                    doc_id = res['id']
+                    doc = doc_dict[doc_id]
+                    candidates.append({
+                        "id": doc_id,
+                        "title": res['title'],
+                        "text": doc.get("content", doc.get("text", "")) 
+                    })
+                    
+                reranked_res = reranker.rerank(query_text, candidates, top_k=RERANKER_TOP_K)
+                print("\nReranked Results:")
+                for rank, res in enumerate(reranked_res, 1):
+                    label = rerank_label(res['rerank_score'])
+                    print(f"Rank {rank} | {res['title']:<19} | Rerank Score: {res['rerank_score']:.2f} | Relevance: {label}")
+                
+            end_time = time.time()
+            print(f"\nQuery completed in {end_time - start_time:.2f}s")
+            print("-" * 60)
 
 if __name__ == "__main__":
     main()
